@@ -1,0 +1,98 @@
+---
+title: "Data Analysis of US College Majors"
+author: "Heli Kolambekar"
+date: "11/16/2021"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float:
+      collapsed: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	fig.height = 4,
+	fig.width = 8,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+# Data Preparation
+
+In this part, data preparation is being done. Data is checked for missing values and the rows have the missing values are deleted. The data set is then re indexed and the ranks column in the data set is also set so that the ranks are consecutive. 
+
+```{r echo=TRUE}
+library(plotly)
+options(scipen = 100)
+
+a = getwd()
+col_majors = read.csv(paste(a,'/recent-grads.csv',sep=''), header = TRUE)
+
+# Checking for missing values in the data set:
+b = apply(is.na(col_majors), 2, which)
+
+# Creating a new data frame after removing the missing values:
+col_majors_new = col_majors[-c(22),]
+
+# Resetting the index:
+row.names(col_majors_new) = NULL
+
+# Setting the rank column values as now, 1 major has been removed:
+col_majors_new['Rank'] = c(1:dim(col_majors_new['Rank'])[1])
+```
+
+# Number of Men & Women in each Major Catagory
+
+In this part, we are analyzing the data set for the total number of men and women in each major category. We want to see what major category is the most widely chosen by the men and women an also are there more categories where there are more men or women.
+
+```{r, echo=TRUE}
+# Analyzing a categorical variable 'major category' for this data set:
+n = c(1:dim(col_majors_new)[1])
+major_cat = unique(col_majors_new$Major_category)
+sum_men = sum_women = 0
+total_men = total_women = c()
+total_employed = total_fulltime = c()
+sum_employed = sum_fulltime = 0
+
+for (i in major_cat) {
+  for (i_1 in n) {
+    if (col_majors_new[i_1,'Major_category'] == i) {
+      sum_men = sum_men + col_majors_new[i_1,'Men']
+      sum_women = sum_women + col_majors_new[i_1,'Women']
+      sum_employed = sum_employed + col_majors_new[i_1,'Employed']
+      sum_fulltime = sum_fulltime + col_majors_new[i_1,'Full_time']
+    }
+  }
+  total_men = c(total_men, sum_men)
+  total_women = c(total_women, sum_women)
+  total_employed = c(total_employed, sum_employed)
+  total_fulltime = c(total_fulltime, sum_fulltime)
+  sum_men = sum_women = 0
+  sum_employed = sum_fulltime = 0
+}
+
+data = data.frame(major_cat,total_men,total_women)
+
+plot_ly(data, x=~major_cat, y=~total_men, type='bar', name='Men') %>%
+  add_trace(y=~total_women, name='Women') %>%
+  layout(yaxis = list(title='Count'), barmode='group', title='Total number of Men & Women in each Major Category', xaxis=list(title='Major Category'))
+```
+
+# Analysis of the Median Salaries of each Major
+In this part, we are checking the distribution of the median salaries using a box plot to check which of the majors are outliers and the spread of the data.
+
+```{r Numcerical Variable, echo=TRUE}
+# Analyzing a numerical variable median earnings for this data set:
+plot_ly(col_majors_new, x=~Median, type='box', name='Median Earnings in $', jitter = 0.3) %>%
+  layout(xaxis = list(title='Amount in $'), title='Box Plot of Median Earnings of each Major')
+five_sum = fivenum(col_majors_new$Median)
+upper_bound = five_sum[4] + (1.5 * (five_sum[4] - five_sum[2]))
+
+# Outlier median salaries of majors:
+out_major = col_majors_new[col_majors_new['Median'] > upper_bound,c('Major','Median')]
+out_major
+```
+
