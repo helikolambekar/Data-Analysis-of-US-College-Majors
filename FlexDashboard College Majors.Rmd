@@ -1,0 +1,310 @@
+---
+title: "Picking a College Major"
+runtime: shiny
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    theme: paper
+    source_code: embed
+    social: menu
+    navbar:
+      - {title: "Data source", href: "https://www.kaggle.com/tunguz/college-majors", icon: "far fa-clipboard"}
+
+---
+
+```{r global, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(viridis)
+library(DT)
+library(plotly)
+library(scales)
+library(viridis)
+library(forcats)
+
+col_majors = read.csv("recent-grads.csv", header = TRUE)
+col_majors = rename(col_majors, "Major_Category" = "Major_category", "Median_Salary" = "Median", "College_Jobs" = "College_jobs", "Unemployment_Rate" = "Unemployment_rate")
+
+# Checking for missing values in the data set:
+b = apply(is.na(col_majors), 2, which)
+
+# Creating a new data frame after removing the missing values:
+col_majors_new = col_majors[-c(22),]
+
+# Resetting the index:
+row.names(col_majors_new) = NULL
+
+# Setting the rank column values as now, 1 major has been removed:
+col_majors_new['Rank'] = c(1:dim(col_majors_new['Rank'])[1])
+
+n = c(1:dim(col_majors_new)[1])
+major_cat = unique(col_majors_new$Major_Category)
+sum_men = sum_women = 0
+total_men = total_women = c()
+total_employed = total_median = total_collegejob = total_unemployment_rate = c()
+sum_employed = sum_median = sum_collegejob = sum_unemployment_rate = 0
+total_major_cat_count = c()
+
+for (i in major_cat) {
+  major_cat_count = 0
+  for (i_1 in n) {
+    if (col_majors_new[i_1,'Major_Category'] == i) {
+      sum_men = sum_men + col_majors_new[i_1,'Men']
+      sum_women = sum_women + col_majors_new[i_1,'Women']
+      sum_employed = sum_employed + col_majors_new[i_1,'Employed']
+      sum_median = sum_median + col_majors_new[i_1,'Median_Salary']
+      sum_collegejob = sum_collegejob + col_majors_new[i_1,'College_Jobs']
+      sum_unemployment_rate = sum_unemployment_rate + col_majors_new[i_1,'Unemployment_Rate']
+      major_cat_count = major_cat_count + 1
+    }
+  }
+  total_major_cat_count = c(total_major_cat_count, major_cat_count)
+  total_men = c(total_men, sum_men)
+  total_women = c(total_women, sum_women)
+  total_employed = c(total_employed, sum_employed)
+  sum_median = sum_median / major_cat_count
+  total_median = c(total_median, sum_median)
+  total_collegejob = c(total_collegejob, sum_collegejob)
+  sum_unemployment_rate = sum_unemployment_rate / major_cat_count
+  total_unemployment_rate = c(total_unemployment_rate, sum_unemployment_rate)
+  sum_men = sum_women = 0
+  sum_employed = sum_median = sum_collegejob = 0
+}
+
+col_majors_new2 = data.frame(Major_Category = major_cat, Men = total_men, Women = total_women, Employed = total_employed, Median_Salary = total_median, College_Jobs = total_collegejob, Unemployment_Rate = total_unemployment_rate, Major_Count = total_major_cat_count)
+
+data_parents = c()
+data_new_col = col_majors_new2[order(col_majors_new2$Major_Category),]
+data_values = rep(1,nrow(col_majors_new))
+data_values = c(data_new_col$Major_Count, data_values)
+data_labels = c(data_new_col$Major_Category, col_majors_new[order(col_majors_new$Major_Category),"Major"])
+
+for (i in 1:nrow(data_new_col)) {
+  data_parents = c(data_parents,rep(data_new_col[i,"Major_Category"], each=data_new_col[i,"Major_Count"]))
+}
+data_parents = c(rep("",nrow(col_majors_new2)),data_parents)
+
+Categorical.Variables = c("Major_Category")
+
+Numerical.Variables = c("Men", "Women", "Employed", "Median_Salary", "College_Jobs", "Unemployment_Rate")
+
+set.seed(544)
+
+samples = 10000
+sample.size = c(10, 20, 30, 40, 50)
+xbar = data.frame(Ten = numeric(samples), Twenty = numeric(samples), Thirty = numeric(samples), Forty = numeric(samples), Fifty = numeric(samples))
+xbar[,1]
+
+for (i in 1:length(sample.size)) {
+  for (j in 1:samples) {
+  xbar[j,i] = mean(sample(col_majors_new$Median_Salary, sample.size[i], replace = FALSE))
+}
+}
+
+sample.size.names = c("Ten", "Twenty", "Thirty", "Forty", "Fifty")
+
+```
+
+# RMarkdown
+
+Row 
+-------------------------------------------------------------------
+### **Data Preparation**
+
+In this part, data preparation is being done. Data is checked for missing values and the rows have the missing values are deleted. The data set is then re indexed and the ranks column in the data set is also set so that the ranks are consecutive. 
+
+Row 
+-------------------------------------------------------------------
+### **Number of Men & Women in each Major Category**
+
+In this part, we are analyzing the data set for the total number of men and women in each major category. We want to see what major category is the most widely chosen by the men and women an also are there more categories where there are more men or women.
+
+```{r fig.height=10}
+# Analyzing a categorical variable 'major category' for this data set:
+major_cat_1 = rep(col_majors_new2$Major_Category,2)
+men_women_1 = c(col_majors_new2$Men, col_majors_new2$Women)
+gender = rep(c("Male", "Female"), each=16)
+df1 = data.frame(major_cat_1, men_women_1, Gender=gender)
+
+renderPlotly({
+  
+  p4 = ggplot(df1, aes(x=major_cat_1, y=men_women_1, fill=Gender)) + geom_bar(stat='identity', position='dodge', aes(text=paste('Major Category:',major_cat_1,'\nCount:', men_women_1,"\nGender:",Gender))) + scale_x_discrete(name ="Major Category") + scale_y_continuous(labels = number, name="Total Count") + theme(axis.text.x = element_text(face="bold", color="#993333", size=10, angle=45),  plot.margin = margin(2, 1, 3, 1, unit="cm"))
+  ggplotly(p4, tooltip="text", res=200)
+  })
+
+```
+
+Row 
+-------------------------------------------------------------------
+### **Major Categories Composition of Data Set**
+
+```{r fig.height=10}
+
+plot_ly(labels=data_labels, parents=data_parents, values=data_values, branchvalues = 'total', type='sunburst')
+
+```
+
+# Graphs
+
+Column {.sidebar data-width=300}
+-------------------------------------------------------------------
+**Data description**
+
+This dataset consists of 172 college majors mentioning their salary, employment rate, number of men and women in each major, among others.
+
+```{r input}
+
+selectInput(inputId="categorical_variable", label = "Select Categorical Variable:", 
+            choices = Categorical.Variables, selected = Categorical.Variables[1])
+
+selectInput(inputId="numeric_variable", label = "Select Numerical Variable:", 
+            choices = Numerical.Variables, selected = Numerical.Variables[2])
+
+uiOutput("cat_choice")
+
+output$cat_choice <- renderUI({
+  selectInput(inputId="numeric_variable_3",
+            label="Select Second Numerical Variable for Scatter Plot",
+            choices= Numerical.Variables[-which(Numerical.Variables==input$numeric_variable)])
+})
+
+selectInput(inputId="n_breaks", label = "Number of bins:", choices = c(10, 20, 35, 50), selected = 20)
+
+```
+
+Row 
+-------------------------------------------------------------------
+
+### **Density Histogram**
+```{r density, fig.height=10}
+renderPlotly({
+  
+  p3 = ggplot(col_majors_new, aes_string(x=input$numeric_variable)) +  geom_histogram(aes(y=..density..), colour="black", fill="white", bins = input$n_breaks)+
+ geom_density(alpha=.2, fill="#FF6666") + scale_y_continuous(labels = number, name="Density") + scale_x_continuous(labels=number)
+  
+  ggplotly(p3, res=200)
+})
+```
+
+Row {.tabset .tabset-fade}
+-------------------------------------------------------------------
+
+### **Box plot** 
+```{r boxplot, fig.height=10}
+renderPlotly({
+  
+  p2 = ggplot(col_majors_new, aes_string(x=input$categorical_variable, y=input$numeric_variable, fill=input$categorical_variable)) + geom_boxplot() + theme(axis.text.x = element_text(face="bold", color="#993333", size=10, angle=45)) + scale_x_discrete(name ="Major Category") + scale_y_continuous(labels = number) + scale_fill_viridis(discrete=TRUE, option="C")
+  
+  ggplotly(p2, res=200)
+})
+```
+
+### **Bar plot** 
+```{r barplot, fig.height=7}
+renderPlotly({
+  p1 = ggplot(col_majors_new2, aes_string(x=input$categorical_variable, y=input$numeric_variable, fill=input$categorical_variable)) + geom_bar(stat='identity', color='blue') + theme(axis.text.x = element_text(face="bold", color="#993333", size=10, angle=45)) + scale_x_discrete(name ="Major Category") + scale_y_continuous(labels = number)
+  
+  ggplotly(p1, res=200)
+
+})
+
+```
+
+### **Scatter Plot** 
+```{r scatterplot, fig.height=7}
+renderPlotly({
+  p1 = ggplot(col_majors_new, aes_string(x=input$numeric_variable_3, y=input$numeric_variable, color="Major_Category")) + geom_point(aes(text=paste('Major:',Major))) + geom_smooth(aes(group=1), method="lm", formula=y~x) + scale_x_continuous(labels = number) + scale_y_continuous(labels = number)
+  
+  ggplotly(p1, res=200)
+
+})
+
+```
+
+# Top 20
+
+Column {.sidebar data-width=300}
+-------------------------------------------------------------------
+**Top 20**
+
+This section shows the top 20 majors by each of the numerical categories.
+
+```{r}
+
+selectInput(inputId="numeric_variable_2", label = "Select Numerical Variable:", 
+          choices = Numerical.Variables, selected = Numerical.Variables[2])
+
+selectInput(inputId="categorical_variable_2", label = "Select Categorical Variable:", 
+            choices = c("Major"), selected = c("Major"))
+
+
+top_20 = reactive({
+  col_majors_new[order(col_majors_new[, input$numeric_variable_2], decreasing = TRUE)[1:20],]
+})
+
+```
+
+Row 
+-------------------------------------------------------------------
+### **Top 20 Bar Plots**
+
+```{r top20, fig.height=7.5}
+
+renderPlotly({
+
+  p1 = ggplot(top_20(), aes(x = fct_reorder(.data[["Major"]], .data[[input$numeric_variable_2]]), y=.data[[input$numeric_variable_2]], fill=.data[["Major"]])) + geom_bar(stat='identity', color='blue') + coord_flip() + scale_y_continuous(labels = number) + scale_x_discrete(name ="Major") + theme(axis.text.y = element_text(face="bold", color="#993333", size=10))
+  
+  ggplotly(p1, res=200)
+
+})
+```
+
+Row 
+-------------------------------------------------------------------
+### **Top 20 by Number of Jobs**
+
+```{r top_20_number, fig.height=10}
+
+total_jobs = col_majors_new[,'College_Jobs'] + col_majors_new[,'Non_college_jobs'] + col_majors_new[,'Low_wage_jobs']
+per_college_jobs = (col_majors_new[,'College_Jobs'] / total_jobs) * 100
+per_non_college_jobs = (col_majors_new[,'Non_college_jobs'] / total_jobs) * 100
+per_low_wage_jobs = (col_majors_new[,'Low_wage_jobs'] / total_jobs) * 100
+
+data_new = data.frame(Major = col_majors_new$Major, per_college_jobs, per_low_wage_jobs, per_non_college_jobs, total_jobs)
+
+data_new = data_new[order(data_new$total_jobs, decreasing = TRUE)[1:20],]
+
+plot_ly(data_new, y=~per_college_jobs, x=fct_reorder(data_new$Major, data_new$total_jobs), type='bar', name='Percentage College Jobs') %>% add_trace(y=~per_low_wage_jobs, name='Percentage Low Wage Jobs') %>% add_trace(y=~per_non_college_jobs, name='Percentage Non College Jobs') %>% layout(yaxis = list(title='Percentage %'), barmode='stack', title='Top 20 Majors by Total Number of Jobs',
+         xaxis=list(title='Major', tickangle=315, tickfont = list(family='Rockwell', color='crimson', size=14)))
+
+```
+
+# Central Limit Theorem
+
+Column {.sidebar data-width=300}
+-------------------------------------------------------------------
+**Sample Size**
+
+```{r clt_input}
+
+selectInput(inputId="sample_size", label = "Select Sample Size:", 
+            choices = sample.size.names, selected = sample.size.names[1])
+
+selectInput(inputId="n_breaks_2", label = "Number of bins:", choices = c(10, 20, 35, 50), selected = 20)
+
+```
+
+Row 
+-------------------------------------------------------------------
+### **Density Histogram for Different Sample Sizes of Median Salary**
+
+```{r clt_density_histogram}
+renderPlotly({
+  
+  p3 = ggplot(xbar, aes_string(x=input$sample_size)) +  geom_histogram(aes(y=..density..), colour="black", fill="white", bins = input$n_breaks_2) +
+ geom_density(alpha=.2, fill="#FF6666") + scale_y_continuous(labels = number, name="Density") + scale_x_continuous(labels=number, name="Median Salary")
+  
+  ggplotly(p3, res=200)
+})
+```
